@@ -515,8 +515,3 @@ Team: **AcademiCSTars**
 MIT — use freely, attribution appreciated.
 
 ---
-
-<p align="center">
-Built with Claude Sonnet 4.6 · Powered by the Anthropic API<br>
-<em>"This is not a tutorial task. You are expected to design systems, not scripts."</em>
-</p>
