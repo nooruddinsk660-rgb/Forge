@@ -66,17 +66,22 @@ export const LogTerminal = ({ logs, t }) => {
             background = "rgba(245, 158, 11, 0.08)";
             padding = "2px 6px";
             borderRadius = "4px";
-          } else if (log.includes("[STAGE]")) {
-            color = "#6366F1";
-            fontWeight = "800";
-          } else if (log.includes("[COMPILER]")) {
-            color = "#8B5CF6";
           } else if (log.includes("[SUCCESS]")) {
             color = "#10B981";
             background = "rgba(16, 185, 129, 0.08)";
             padding = "2px 6px";
             borderRadius = "4px";
+            fontWeight = "700";
+          } else if (log.includes("[STAGE]")) {
+            color = "#6366F1";
+            fontWeight = "800";
+          } else if (log.includes("[LLM]")) {
+            color = "#8B5CF6";
+            fontWeight = "600";
+          } else if (log.includes("[COMPILER]")) {
+            color = "#8B5CF6";
           }
+
 
           return (
             <div key={index} style={{ color, background, padding, borderRadius, fontWeight, whiteSpace: "pre-wrap", display: "inline-block", alignSelf: "flex-start", width: "100%" }}>

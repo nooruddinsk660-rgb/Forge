@@ -243,20 +243,51 @@ export const CompileScreen = ({
               </div>
             </div>
 
-            {/* Live Console Logs Ticker */}
+            {/* Live Console Logs — rolling 4-line window */}
             <div style={{
-              background: "rgba(5, 5, 8, 0.85)", border: `1.5px solid ${t.bdr2}`, borderRadius: 12,
+              background: "rgba(5, 5, 8, 0.90)", border: `1.5px solid ${t.bdr2}`, borderRadius: 12,
               padding: "14px 20px", fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-              color: "#F59E0B", maxWidth: 700, width: "100%", overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "nowrap", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-              display: "flex", alignItems: "center", gap: 12, backdropFilter: "blur(10px)"
+              maxWidth: 700, width: "100%", boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+              backdropFilter: "blur(10px)"
             }}>
-              <span style={{ color: "#EF4444", fontWeight: 900, animation: "blink 1.2s infinite" }}>●</span>
-              <span style={{ color: t.dim, marginRight: 4, fontWeight: 800, fontSize: 10 }}>[LIVE RUNSTREAM]</span>
-              <span style={{ color: "#E4E4E7" }}>{logs.length > 0 ? logs[logs.length - 1] : "Initializing AST token stream..."}</span>
+              {/* ticker header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, borderBottom: `1px solid ${t.bdr2}`, paddingBottom: 8 }}>
+                <span style={{ color: "#EF4444", fontWeight: 900, animation: "blink 1.2s infinite" }}>●</span>
+                <span style={{ color: t.dim, fontWeight: 800, fontSize: 9, letterSpacing: "0.12em" }}>[LIVE RUNSTREAM]</span>
+                <span style={{ color: t.sub, fontSize: 9, marginLeft: "auto" }}>{logs.length} events</span>
+              </div>
+              {/* last 4 log lines */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(logs.length === 0 ? ["Initializing AST token stream..."] : logs.slice(-4)).map((line, i, arr) => {
+                  const isLatest = i === arr.length - 1;
+                  const color = line.includes("[ERROR]") ? "#EF4444"
+                              : line.includes("[WARN]")  ? "#F59E0B"
+                              : line.includes("[SUCCESS]") ? "#10B981"
+                              : line.includes("[STAGE]") ? "#6366F1"
+                              : line.includes("[LLM]")   ? "#8B5CF6"
+                              : "#A1A1AA";
+                  return (
+                    <div key={i} style={{
+                      color: isLatest ? "#E4E4E7" : color,
+                      opacity: isLatest ? 1 : 0.45 + (i / arr.length) * 0.4,
+                      fontSize: isLatest ? 11 : 10,
+                      fontWeight: isLatest ? 700 : 400,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      display: "flex", alignItems: "center", gap: 6
+                    }}>
+                      <span style={{ color, flexShrink: 0 }}>›</span>
+                      {line}
+                      {isLatest && (
+                        <span style={{ display: "inline-block", width: 6, height: 13, background: "#6366F1", marginLeft: 2, animation: "blink 0.9s infinite", verticalAlign: "middle", borderRadius: 1 }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
+
 
         {/* Compiler Finished view */}
         {done && !running && (

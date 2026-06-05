@@ -3,8 +3,40 @@ import { createCostTracker, estimateTokens } from "./cost.js";
 import { buildIR, IR_NAMING } from "./ir.js";
 import { crossLayerValidate, validateSchema } from "./validator.js";
 
-// Helper to simulate sleep
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Small yield so React can paint between micro-tasks
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+// Emit a burst of live sub-task logs while the LLM fetch is in-flight.
+// `fetchPromise` resolves when the API call completes;
+// until then we fire rapid logs so the terminal looks alive.
+async function streamingLog(fetchPromise, stageId, onLogEmit) {
+  const STAGE_SUBTASKS = {
+    lexer:     ["Tokenizing intent vector...","Parsing feature flags...","Resolving entity surface forms...","Scoring lexical ambiguity...","Extracting role identifiers...","Normalizing compound nouns...","Computing confidence weights...","Emitting token stream..."],
+    parser:    ["Building Abstract Syntax Tree...","Resolving entity relations...","Mapping user flows to roles...","Extracting feature graph edges...","Linking auth requirements...","Validating AST node types...","Folding nested structures...","Serializing parser output..."],
+    ir:        ["Locking entity naming conventions...","Generating table name map...","Assigning endpoint IDs...","Building IR constraint matrix...","Resolving naming collisions...","Emitting deterministic IR...","Cross-referencing entity types...","IR context ready."],
+    semantic:  ["Analysing role hierarchy...","Building permission matrix...","Resolving RBAC inheritance...","Applying business rule set...","Checking field-level guards...","Validating constraint coverage...","Emitting semantic model...","Role analysis complete."],
+    codegen:   ["Emitting DB schema tables...","Generating API endpoint stubs...","Allocating page route config...","Linking auth middleware stubs...","Generating column constraints...","Resolving FK references...","Building UI component tree...","Serialising 4-schema payload...","Code generation done."],
+    linker:    ["Binding UI→API surface...","Binding API→DB columns...","Cross-checking role guards...","Detecting orphan endpoints...","Resolving stack metadata...","Calculating env variables...","Linker pass complete."],
+    validator: ["CHECK 1: API→DB field drift...","CHECK 2: UI data bindings...","CHECK 3: Page role guards...","CHECK 4: Endpoint role guards...","CHECK 5: Auth route existence...","CHECK 6: IR entity→table map...","CHECK 7: Primary key coverage...","CHECK 8: Payments flag sync...","Scoring contract checks..."],
+    repair:    ["Scanning validator issues...","Computing minimal patch set...","Applying ADD_TABLE patches...","Applying RESOLVE_DRIFT patches...","Re-binding FK references...","Patching role guard gaps...","Verifying patch idempotency...","Repair engine done."],
+    verify:    ["Re-running validator checks...","Comparing before vs after scores...","Confirming patch fixes...","Checking remaining issues...","Calculating improvement delta...","Emitting verification result...","All contracts verified."]
+  };
+
+  const subtasks = STAGE_SUBTASKS[stageId] || ["Processing..."];
+  let i = 0;
+  let done = false;
+
+  fetchPromise.finally(() => { done = true; });
+
+  while (!done) {
+    const msg = subtasks[i % subtasks.length];
+    onLogEmit(`[${stageId.toUpperCase()}] ${msg}`);
+    i++;
+    // Wait ~220ms between sub-task logs, but abort as soon as fetch resolves
+    const delay = new Promise(r => setTimeout(r, 220));
+    await Promise.race([fetchPromise.then(() => {}), fetchPromise.catch(() => {}), delay]);
+  }
+}
 
 const ANTHROPIC_MODEL_MAP = {
   "claude-haiku-4-5-20251001": "claude-3-5-haiku-20241022",
@@ -713,7 +745,7 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
     onLogEmit(`[COMPILER] [SIMULATION MODE] No API Key detected in workspace. Attempting live compiler call with empty credentials (test runner mock fallback)...`);
   }
   
-  await sleep(600);
+  await tick();
 
   const finalOutputs = {};
   let accumulatedPrev = "";
@@ -724,37 +756,44 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
 
   for (const stageId of stagesList) {
     onStageStart(stageId);
-    onLogEmit(`[STAGE] Starting stage: ${stageId.toUpperCase()}...`);
-    await sleep(400);
+    onLogEmit(`[STAGE] ── Starting stage: ${stageId.toUpperCase()} ──`);
+    await tick();
 
     let stageData;
     let inTokens = Math.round(500 + Math.random() * 200);
     let outTokens = Math.round(800 + Math.random() * 400);
 
     if (!fallbackToSimulation) {
-      onLogEmit(`[LLM] Formulating prompt for stage: ${stageId.toUpperCase()}...`);
+      onLogEmit(`[LLM] Sending stage ${stageId.toUpperCase()} prompt to model...`);
       const userPrompt = STAGE_PROMPT(stageId, accumulatedPrev, prompt, irDataContext);
       const systemInstruction = "You are a code compiler agent. Return ONLY valid JSON matching the schema example exactly. Do not include markdown wraps, conversational dialogue, or introductory prose.";
       
       try {
-        let response;
+        let fetchPromise;
         if (isOllama) {
-          response = await callOllamaAPI(modelId, systemInstruction, userPrompt);
+          fetchPromise = callOllamaAPI(modelId, systemInstruction, userPrompt);
         } else if (isGemini) {
-          response = await callGeminiAPI(resolvedKey, modelId, systemInstruction, userPrompt);
+          fetchPromise = callGeminiAPI(resolvedKey, modelId, systemInstruction, userPrompt);
         } else if (isGroq) {
-          response = await callGroqAPI(resolvedKey, modelId, systemInstruction, userPrompt);
+          fetchPromise = callGroqAPI(resolvedKey, modelId, systemInstruction, userPrompt);
         } else if (isOpenRouter) {
-          response = await callOpenRouterAPI(resolvedKey, modelId, systemInstruction, userPrompt);
+          fetchPromise = callOpenRouterAPI(resolvedKey, modelId, systemInstruction, userPrompt);
         } else {
-          response = await callAnthropicAPI(resolvedKey, modelId, systemInstruction, userPrompt);
+          fetchPromise = callAnthropicAPI(resolvedKey, modelId, systemInstruction, userPrompt);
         }
+
+        // Fire streaming sub-task logs concurrently while the LLM actually runs
+        const [response] = await Promise.all([
+          fetchPromise,
+          streamingLog(fetchPromise, stageId, onLogEmit)
+        ]);
+
         stageData = response.json;
         inTokens = response.inputTokens;
         outTokens = response.outputTokens;
-        onLogEmit(`[LLM] Stage ${stageId.toUpperCase()} generated successfully. (Tokens: In: ${inTokens} | Out: ${outTokens})`);
+        onLogEmit(`[SUCCESS] ${stageId.toUpperCase()} complete — In: ${inTokens} tok | Out: ${outTokens} tok`);
       } catch (err) {
-        onLogEmit(`[WARN] Live API call failed for stage ${stageId}: ${err.message}. Falling back to deterministic generation.`);
+        onLogEmit(`[WARN] Live call failed for ${stageId}: ${err.message} — switching to deterministic fallback.`);
         fallbackToSimulation = true;
         stageData = staticOutputs[stageId];
       }
@@ -773,8 +812,8 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
 
     costTracker.record(stageId, modelId, inTokens, outTokens);
 
-    onLogEmit(`[STAGE] Running syntax and schema validations on input AST...`);
-    await sleep(200);
+    onLogEmit(`[STAGE] Running schema validation on stage output...`);
+    await tick();
 
     const validation = validateSchema(stageId, stageData);
     if (!validation.valid) {
@@ -824,7 +863,7 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
     };
 
     onStageComplete(stageId, finalOutputs[stageId]);
-    await sleep(200);
+    await tick();
   }
 
   onLogEmit(`[COMPILER] Compilation complete. Emitting final code artifacts.`);
