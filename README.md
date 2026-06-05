@@ -516,12 +516,7 @@ MIT — use freely, attribution appreciated.
 
 ---
 
-<div align="center">
-
-Built with Claude Sonnet 4.6 · Powered by the Anthropic API
-
-*"This is not a tutorial task. You are expected to design systems, not scripts."*
-
-</div>
-#   F o r g e  
- 
+<p align="center">
+Built with Claude Sonnet 4.6 · Powered by the Anthropic API<br>
+<em>"This is not a tutorial task. You are expected to design systems, not scripts."</em>
+</p>
