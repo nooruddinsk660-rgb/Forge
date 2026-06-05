@@ -1,21 +1,17 @@
 import { applyRateLimit } from './_rateLimit.js';
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (!applyRateLimit(req, res)) return;
 
-  // ── Rate limiting ────────────────────────────────────────────────────────
-  if (!applyRateLimit(req, res)) return; // 429 already sent
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // BYOK: use the key the client sent, fall back to server env var
+  const apiKey = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
+    return res.status(401).json({
+      error: 'No API key provided. Add your Anthropic API key in the app settings.'
+    });
   }
 
   try {
@@ -24,7 +20,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': req.headers['anthropic-version'] || '2023-06-01',
       },
       body: JSON.stringify(req.body),
     });

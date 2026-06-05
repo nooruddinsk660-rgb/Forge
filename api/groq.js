@@ -1,20 +1,20 @@
 import { applyRateLimit } from './_rateLimit.js';
 
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // ── Rate limiting ────────────────────────────────────────────────────────
   if (!applyRateLimit(req, res)) return;
 
-  const apiKey = process.env.GROQ_API_KEY;
+  // BYOK: client sends their own key in Authorization header
+  const authHeader = req.headers['authorization'] || '';
+  const clientKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const apiKey = clientKey || process.env.GROQ_API_KEY;
+
   if (!apiKey) {
-    return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
+    return res.status(401).json({
+      error: 'No API key provided. Add your Groq API key in the app settings.'
+    });
   }
 
   try {
