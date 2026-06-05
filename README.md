@@ -505,8 +505,8 @@ The Calcutta Technical School, Maheshtala, Kolkata
 - GitHub: [@nooruddinsk660-rgb](https://github.com/nooruddinsk660-rgb)
 - Email: nooruddinsk660@gmail.com
 - Oracle Cloud Infrastructure 2025 Generative AI Professional
+- LinkedIn: [Sk_Nooruddin](https://www.linkedin.com/in/sk-nooruddin-ab135a389)
 
-Team: **AcademiCSTars**
 
 ---
 
