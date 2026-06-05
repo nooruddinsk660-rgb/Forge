@@ -498,7 +498,7 @@ FORGE addresses each requirement with a specific architectural decision, documen
 
 ## Author
 
-**Sk Nooruddin (Noor)**
+**Sk Nooruddin**
 3rd Year Diploma in Computer Science & Technology
 The Calcutta Technical School, Maheshtala, Kolkata
 
