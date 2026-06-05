@@ -227,15 +227,17 @@ const callOpenRouterAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
   }
 };
 
-// Make call to Gemini API directly client-side
-const callGeminiAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
+// Make call to Gemini API via serverless proxy (key lives server-side)
+const callGeminiAPI = async (_apiKey, modelId, systemPrompt, userPrompt) => {
   const model = modelId || "gemini-1.5-flash";
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const res = await fetch(`/api/gemini`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-device-fingerprint": getDeviceFingerprint()
     },
     body: JSON.stringify({
+      model,
       contents: [
         {
           role: "user",
@@ -264,6 +266,7 @@ const callGeminiAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
     throw new Error(`Failed to parse valid JSON from Gemini response: ${err.message}\nOutput: ${text}`, { cause: err });
   }
 };
+
 
 // Make call to local Ollama server via local dev server proxy
 const callOllamaAPI = async (modelId, systemPrompt, userPrompt) => {

@@ -6,6 +6,7 @@
     { "source": "/api/anthropic/:path*", "destination": "/api/anthropic" },
     { "source": "/api/groq/:path*",      "destination": "/api/groq"      },
     { "source": "/api/openrouter/:path*","destination": "/api/openrouter" },
+    { "source": "/api/gemini/:path*",    "destination": "/api/gemini"    },
     { "source": "/(.*)",                 "destination": "/index.html"    }
   ],
   "headers": [
