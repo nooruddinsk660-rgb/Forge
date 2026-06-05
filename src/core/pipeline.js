@@ -6,36 +6,179 @@ import { getDeviceFingerprint } from "./fingerprint.js";
 
 // Small yield so React can paint between micro-tasks
 const tick = () => new Promise(r => setTimeout(r, 0));
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Emit a burst of live sub-task logs while the LLM fetch is in-flight.
-// `fetchPromise` resolves when the API call completes;
-// until then we fire rapid logs so the terminal looks alive.
-async function streamingLog(fetchPromise, stageId, onLogEmit) {
-  const STAGE_SUBTASKS = {
-    lexer:     ["Tokenizing intent vector...","Parsing feature flags...","Resolving entity surface forms...","Scoring lexical ambiguity...","Extracting role identifiers...","Normalizing compound nouns...","Computing confidence weights...","Emitting token stream..."],
-    parser:    ["Building Abstract Syntax Tree...","Resolving entity relations...","Mapping user flows to roles...","Extracting feature graph edges...","Linking auth requirements...","Validating AST node types...","Folding nested structures...","Serializing parser output..."],
-    ir:        ["Locking entity naming conventions...","Generating table name map...","Assigning endpoint IDs...","Building IR constraint matrix...","Resolving naming collisions...","Emitting deterministic IR...","Cross-referencing entity types...","IR context ready."],
-    semantic:  ["Analysing role hierarchy...","Building permission matrix...","Resolving RBAC inheritance...","Applying business rule set...","Checking field-level guards...","Validating constraint coverage...","Emitting semantic model...","Role analysis complete."],
-    codegen:   ["Emitting DB schema tables...","Generating API endpoint stubs...","Allocating page route config...","Linking auth middleware stubs...","Generating column constraints...","Resolving FK references...","Building UI component tree...","Serialising 4-schema payload...","Code generation done."],
-    linker:    ["Binding UI→API surface...","Binding API→DB columns...","Cross-checking role guards...","Detecting orphan endpoints...","Resolving stack metadata...","Calculating env variables...","Linker pass complete."],
-    validator: ["CHECK 1: API→DB field drift...","CHECK 2: UI data bindings...","CHECK 3: Page role guards...","CHECK 4: Endpoint role guards...","CHECK 5: Auth route existence...","CHECK 6: IR entity→table map...","CHECK 7: Primary key coverage...","CHECK 8: Payments flag sync...","Scoring contract checks..."],
-    repair:    ["Scanning validator issues...","Computing minimal patch set...","Applying ADD_TABLE patches...","Applying RESOLVE_DRIFT patches...","Re-binding FK references...","Patching role guard gaps...","Verifying patch idempotency...","Repair engine done."],
-    verify:    ["Re-running validator checks...","Comparing before vs after scores...","Confirming patch fixes...","Checking remaining issues...","Calculating improvement delta...","Emitting verification result...","All contracts verified."]
-  };
+// Minimum wall-clock time each stage must spend (milliseconds).
+// Ensures the pipeline looks like real heavy computation even in simulation.
+// Total: ~130s ≈ 2 min 10 sec
+const STAGE_MIN_MS = {
+  lexer:     8_000,   //  8s  — intent tokenisation
+  parser:    12_000,  // 12s  — AST construction
+  ir:        16_000,  // 16s  — deterministic IR build
+  semantic:  13_000,  // 13s  — RBAC + permission matrix
+  codegen:   28_000,  // 28s  — 4-schema emission (heaviest)
+  linker:    14_000,  // 14s  — cross-layer binding
+  validator: 13_000,  // 13s  — 8-check contract enforcement
+  repair:    18_000,  // 18s  — surgical patch engine
+  verify:    10_000,  // 10s  — post-repair verification
+};
 
+// Sub-task log messages shown while each stage runs
+const STAGE_SUBTASKS = {
+  lexer:     [
+    "Tokenizing intent vector...",
+    "Parsing feature flag surface...",
+    "Resolving entity surface forms...",
+    "Scoring lexical ambiguity index...",
+    "Extracting role identifier graph...",
+    "Normalizing compound noun clusters...",
+    "Computing confidence weight matrix...",
+    "Cross-referencing domain vocabulary...",
+    "Applying NLP stopword filters...",
+    "Emitting final token stream...",
+  ],
+  parser:    [
+    "Building Abstract Syntax Tree...",
+    "Resolving entity relation edges...",
+    "Mapping user flows to role nodes...",
+    "Extracting feature graph topology...",
+    "Linking auth requirement nodes...",
+    "Validating AST node type signatures...",
+    "Folding nested entity structures...",
+    "Running parse tree sanity checks...",
+    "Applying grammar normalization pass...",
+    "Serializing parser output blob...",
+  ],
+  ir:        [
+    "Locking entity naming conventions...",
+    "Generating canonical table name map...",
+    "Assigning deterministic endpoint IDs...",
+    "Building IR constraint adjacency matrix...",
+    "Resolving entity naming collisions...",
+    "Applying IR_NAMING convention pass...",
+    "Emitting deterministic IR specification...",
+    "Cross-referencing entity type signatures...",
+    "Computing IR complexity score...",
+    "IR context snapshot ready.",
+  ],
+  semantic:  [
+    "Analysing role hierarchy graph...",
+    "Building RBAC permission matrix...",
+    "Resolving role inheritance chains...",
+    "Applying business rule constraint set...",
+    "Checking field-level access guards...",
+    "Validating constraint coverage ratios...",
+    "Running permission conflict detector...",
+    "Verifying principle of least privilege...",
+    "Emitting semantic role model...",
+    "Role analysis complete.",
+  ],
+  codegen:   [
+    "Emitting DB schema table definitions...",
+    "Generating API endpoint route stubs...",
+    "Allocating page route configuration...",
+    "Linking auth middleware injection points...",
+    "Generating column type constraints...",
+    "Resolving foreign key reference graph...",
+    "Building UI component dependency tree...",
+    "Generating index definitions...",
+    "Applying database normalisation rules...",
+    "Cross-validating API response shapes...",
+    "Resolving UI data-binding contracts...",
+    "Serialising 4-schema unified payload...",
+    "Running post-emission lint pass...",
+    "Code generation pipeline done.",
+  ],
+  linker:    [
+    "Binding UI component → API endpoint surface...",
+    "Binding API response fields → DB columns...",
+    "Cross-checking role guard consistency...",
+    "Detecting orphan endpoints...",
+    "Resolving stack dependency metadata...",
+    "Calculating required environment variables...",
+    "Mapping page routes to auth guards...",
+    "Validating endpoint ID namespace...",
+    "Linker pass complete.",
+  ],
+  validator: [
+    "CHECK 1: API response → DB column drift...",
+    "CHECK 2: UI data-binding → endpoint IDs...",
+    "CHECK 3: Page role guards → semantic roles...",
+    "CHECK 4: Endpoint role guards → semantic roles...",
+    "CHECK 5: Auth routes → API schema existence...",
+    "CHECK 6: IR entities → DB table coverage...",
+    "CHECK 7: DB tables → primary key presence...",
+    "CHECK 8: Payments flag → table sync...",
+    "Aggregating check results...",
+    "Computing contract compliance score...",
+    "Emitting validator report...",
+  ],
+  repair:    [
+    "Scanning validator issue manifests...",
+    "Prioritising patches by severity...",
+    "Computing minimal idempotent patch set...",
+    "Applying ADD_TABLE patches...",
+    "Applying RESOLVE_DRIFT patches...",
+    "Re-binding FK reference graph...",
+    "Patching role guard coverage gaps...",
+    "Running patch conflict resolver...",
+    "Verifying patch idempotency constraints...",
+    "Repair engine done.",
+  ],
+  verify:    [
+    "Re-running validator check suite...",
+    "Comparing before vs after score vectors...",
+    "Confirming patch fix resolutions...",
+    "Checking for remaining open issues...",
+    "Calculating improvement delta...",
+    "Verifying cross-layer consistency post-repair...",
+    "Emitting verification result artifact...",
+    "All contracts verified.",
+  ],
+};
+
+/**
+ * Streams sub-task log messages for `stageId` until BOTH conditions are met:
+ *   1. `workPromise` has resolved (real LLM call or simulation finished)
+ *   2. `minMs` milliseconds have elapsed
+ *
+ * Log interval: 600ms normally, 900ms when nearing the minimum threshold
+ * (slows down to feel deliberate during the "thinking" phase).
+ */
+async function streamingLog(workPromise, stageId, onLogEmit, minMs = 0) {
   const subtasks = STAGE_SUBTASKS[stageId] || ["Processing..."];
+  const startAt = Date.now();
+  const deadline = startAt + minMs;
   let i = 0;
-  let done = false;
+  let workDone = false;
 
-  fetchPromise.finally(() => { done = true; });
+  workPromise
+    .then(() => { workDone = true; })
+    .catch(() => { workDone = true; });
 
-  while (!done) {
+  while (true) {
+    const now = Date.now();
+    const elapsed = now - startAt;
+    const remaining = deadline - now;
+
+    // Exit only when both the work AND the minimum time are done
+    if (workDone && remaining <= 0) break;
+
     const msg = subtasks[i % subtasks.length];
     onLogEmit(`[${stageId.toUpperCase()}] ${msg}`);
     i++;
-    // Wait ~220ms between sub-task logs, but abort as soon as fetch resolves
-    const delay = new Promise(r => setTimeout(r, 220));
-    await Promise.race([fetchPromise.then(() => {}), fetchPromise.catch(() => {}), delay]);
+
+    // Slow the log interval down in the final 20% of the minimum window
+    // so it feels like the model is really "thinking" not just ticking fast
+    const pct = minMs > 0 ? elapsed / minMs : 1;
+    const interval = pct > 0.8 ? 900 : 600;
+
+    const delay = sleep(interval);
+    await Promise.race([
+      delay,
+      // Don't exit early just because work is done — minimum must be met too
+      ...(workDone && remaining > 0 ? [] : [workPromise.catch(() => {})])
+    ]);
   }
 }
 
@@ -789,10 +932,12 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
           fetchPromise = callAnthropicAPI(resolvedKey, modelId, systemInstruction, userPrompt);
         }
 
-        // Fire streaming sub-task logs concurrently while the LLM actually runs
+        // Run LLM call + minimum stage timer concurrently.
+        // streamingLog keeps emitting logs until BOTH finish.
+        const minMs = STAGE_MIN_MS[stageId] || 8_000;
         const [response] = await Promise.all([
           fetchPromise,
-          streamingLog(fetchPromise, stageId, onLogEmit)
+          streamingLog(fetchPromise, stageId, onLogEmit, minMs)
         ]);
 
         stageData = response.json;
@@ -805,7 +950,11 @@ export const runCompilationPipeline = async (prompt, options, onStageStart, onSt
         stageData = staticOutputs[stageId];
       }
     } else {
-      // Simulation fallback mode (triggered initially if no key is present and fetch fails, or subsequently after failure)
+      // Simulation mode: data is instant, but we still enforce the minimum
+      // duration so the pipeline looks like real heavy computation.
+      const minMs = STAGE_MIN_MS[stageId] || 8_000;
+      const resolved = Promise.resolve();
+      await streamingLog(resolved, stageId, onLogEmit, minMs);
       stageData = staticOutputs[stageId];
     }
 
