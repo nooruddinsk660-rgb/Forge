@@ -2,6 +2,7 @@
 import { createCostTracker, estimateTokens } from "./cost.js";
 import { buildIR, IR_NAMING } from "./ir.js";
 import { crossLayerValidate, validateSchema } from "./validator.js";
+import { getDeviceFingerprint } from "./fingerprint.js";
 
 // Small yield so React can paint between micro-tasks
 const tick = () => new Promise(r => setTimeout(r, 0));
@@ -103,15 +104,16 @@ Compare BEFORE (validator) vs AFTER (repair) and confirm fixes.
   return shapes[stageId] || "";
 };
 
-// Make call to Anthropic API via the local proxy
+// Make call to Anthropic API via the serverless proxy
 const callAnthropicAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
   const model = ANTHROPIC_MODEL_MAP[modelId] || "claude-3-5-sonnet-20241022";
-  const res = await fetch("/api/anthropic/v1/messages", {
+  const res = await fetch("/api/anthropic", {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
-      "content-type": "application/json"
+      "content-type": "application/json",
+      "x-device-fingerprint": getDeviceFingerprint()
     },
     body: JSON.stringify({
       model,
@@ -149,14 +151,15 @@ const OPENROUTER_MODEL_MAP = {
   "openrouter-qwen-2.5-72b": "qwen/qwen-2.5-72b-instruct"
 };
 
-// Make call to Groq API via local dev server proxy
+// Make call to Groq API via serverless proxy
 const callGroqAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
   const model = GROQ_MODEL_MAP[modelId] || "llama-3.1-70b-versatile";
-  const res = await fetch("/api/groq/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-device-fingerprint": getDeviceFingerprint()
     },
     body: JSON.stringify({
       model,
@@ -185,16 +188,17 @@ const callGroqAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
   }
 };
 
-// Make call to OpenRouter API via local dev server proxy
+// Make call to OpenRouter API via serverless proxy
 const callOpenRouterAPI = async (apiKey, modelId, systemPrompt, userPrompt) => {
   const model = OPENROUTER_MODEL_MAP[modelId] || "meta-llama/llama-3.1-8b-instruct:free";
-  const res = await fetch("/api/openrouter/api/v1/chat/completions", {
+  const res = await fetch("/api/openrouter", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:5173",
-      "X-Title": "Forge NL App Compiler"
+      "HTTP-Referer": window.location.origin,
+      "X-Title": "Forge NL App Compiler",
+      "x-device-fingerprint": getDeviceFingerprint()
     },
     body: JSON.stringify({
       model,

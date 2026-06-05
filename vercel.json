@@ -3,9 +3,19 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/anthropic", "destination": "/api/anthropic" },
-    { "source": "/api/groq",      "destination": "/api/groq"      },
-    { "source": "/api/openrouter","destination": "/api/openrouter" },
-    { "source": "/(.*)",          "destination": "/index.html"    }
+    { "source": "/api/anthropic/:path*", "destination": "/api/anthropic" },
+    { "source": "/api/groq/:path*",      "destination": "/api/groq"      },
+    { "source": "/api/openrouter/:path*","destination": "/api/openrouter" },
+    { "source": "/(.*)",                 "destination": "/index.html"    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin",  "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, x-api-key, anthropic-version, Authorization, x-device-fingerprint" }
+      ]
+    }
   ]
 }
