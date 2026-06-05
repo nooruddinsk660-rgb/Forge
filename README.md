@@ -1,26 +1,23 @@
-# FORGE v4.0 — Natural Language → App Compiler
+<h1 align="center">FORGE v4.0 — Natural Language → App Compiler</h1>
 
-<div align="center">
-
-```
+<pre align="center">
   ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
   ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
   █████╗  ██║   ██║██████╔╝██║  ███╗█████╗
   ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝
   ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
   ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-```
+</pre>
 
-**A 9-stage IR-first compiler that converts natural language into a validated,
-cross-layer-consistent application specification.**
+<p align="center"><strong>A 9-stage IR-first compiler that converts natural language into a validated,<br>cross-layer-consistent application specification.</strong></p>
 
-[![Pipeline](https://img.shields.io/badge/pipeline-9--stage-6366F1?style=flat-square)](.)
-[![IR-First](https://img.shields.io/badge/architecture-IR--first-10B981?style=flat-square)](.)
-[![Cost Tracking](https://img.shields.io/badge/cost-₹%20INR%20tracked-F59E0B?style=flat-square)](.)
-[![Validation](https://img.shields.io/badge/validation-cross--layer-EC4899?style=flat-square)](.)
-[![Model](https://img.shields.io/badge/model-Claude%20Sonnet%204.6-8B5CF6?style=flat-square)](.)
-
-</div>
+<p align="center">
+  <img src="https://img.shields.io/badge/pipeline-9--stage-6366F1?style=flat-square" alt="Pipeline">
+  <img src="https://img.shields.io/badge/architecture-IR--first-10B981?style=flat-square" alt="IR-First">
+  <img src="https://img.shields.io/badge/cost-₹%20INR%20tracked-F59E0B?style=flat-square" alt="Cost Tracking">
+  <img src="https://img.shields.io/badge/validation-cross--layer-EC4899?style=flat-square" alt="Validation">
+  <img src="https://img.shields.io/badge/model-Claude%20Sonnet%204.6-8B5CF6?style=flat-square" alt="Model">
+</p>
 
 ---
 
